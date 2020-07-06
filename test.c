@@ -42,14 +42,12 @@ static void check_bin(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t f2, 
     mpz_init(r1);
     f1(r1, a1, b1);
 
-    z_int a2 = mpz_to_z(a1),
-        b2 = mpz_to_z(b1),
-        r2 = mpz_to_z(r1),
-        u2 = f2(a2, b2);
+    z_auto(a2, mpz_to_z(a1));
+    z_auto(b2, mpz_to_z(b1));
+    z_auto(r2, mpz_to_z(r1));
+    z_auto(u2, f2(a2, b2));
 
-    if (u2.err) {
-        gmp_printf("%s errored\n", name);
-    } else if (z_cmp(u2, r2) != 0) {
+    if (z_cmp(u2, r2) != 0) {
         mpz_t u1;
         z_to_mpz(u1, u2);
         gmp_printf("%s returned invalid result\na = %Zd\nb = %Zd\nr = %Zd\nR = %Zd\n",
@@ -60,8 +58,6 @@ static void check_bin(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t f2, 
     }
 
     mpz_clear(r1);
-
-    z_frees(a2, b2, r2, u2);
 }
 
 static void check_bin_long(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t f2, long x, long y) {

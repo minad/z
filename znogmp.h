@@ -216,7 +216,7 @@ _z_inl void _zd_div_knuth_step(z_digit* q, z_digit* u, z_digit* v, z_size n, z_s
 }
 
 // Knuth's algorithm D, adapted from Hacker's Delight by Warren
-_z_inl bool _zd_div_knuth(z_digit* q, z_digit* r,
+_z_inl void _zd_div_knuth(z_digit* q, z_digit* r,
                           const z_digit* u, z_size m,
                           const z_digit* v, z_size n) {
     Z_ASSERT(m >= n);
@@ -227,12 +227,11 @@ _z_inl bool _zd_div_knuth(z_digit* q, z_digit* r,
     unsigned s = (unsigned)(__builtin_clzll(v[n - 1]) - 8 * (int)sizeof(long long) + Z_BITS);
     z_size needed = n + m + 1;
     z_digit scratch[Z_SCRATCH],
-        *vn = _z_unlikely(needed > Z_SCRATCH)
+        *vn = needed > Z_SCRATCH
         ? (z_digit*)Z_ALLOC(sizeof (z_digit) * (size_t)needed)
         : scratch,
         *un = vn + n;
-    if (_z_unlikely(!vn))
-        return false;
+    Z_ASSERT(vn);
 
     // Normalize
     if (s) {
@@ -255,19 +254,16 @@ _z_inl bool _zd_div_knuth(z_digit* q, z_digit* r,
 
     if (vn != scratch)
         Z_FREE(vn);
-
-    return true;
 }
 
-_z_inl bool zd_divmod(z_digit* q, z_digit* r,
+_z_inl void zd_divmod(z_digit* q, z_digit* r,
                       const z_digit* u, z_size m,
                       const z_digit* v, z_size n) {
     Z_ASSERT(m >= n);
     Z_ASSERT(n > 0);
     Z_ASSERT(v[n - 1]);
-    if (n == 1) {
+    if (n == 1)
         r[0] = _zd_div_1(q, u, m, v[0]);
-        return true;
-    }
-    return _zd_div_knuth(q, r, u, m, v, n);
+    else
+        _zd_div_knuth(q, r, u, m, v, n);
 }
