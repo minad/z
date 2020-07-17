@@ -14,7 +14,7 @@
 #define TEST_RUNS  5000
 
 typedef void (*mpz_bin_t)(mpz_ptr, mpz_srcptr, mpz_srcptr);
-typedef z_int (*z_bin_t)(z_int, z_int);
+typedef z_res (*z_bin_t)(z_int, z_int);
 
 static gmp_randstate_t randstate;
 
@@ -45,9 +45,11 @@ static void check_bin(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t f2, 
     z_auto(a2, mpz_to_z(a1));
     z_auto(b2, mpz_to_z(b1));
     z_auto(r2, mpz_to_z(r1));
-    z_auto(u2, f2(a2, b2));
+    z_auto(u2, f2(a2, b2).z);
 
-    if (z_cmp(u2, r2) != 0) {
+    if (u2.err) {
+        gmp_printf("%s failed\n", name);
+    } else if (z_cmp(u2, r2) != 0) {
         mpz_t u1;
         z_to_mpz(u1, u2);
         gmp_printf("%s returned invalid result\na = %Zd\nb = %Zd\nr = %Zd\nR = %Zd\n",

@@ -19,5 +19,5 @@
 #define zd_sub mpn_sub
 #define zd_sub_1 mpn_sub_1
 #define zd_sub_n mpn_sub_n
-#define zd_divmod(q,r,u,m,v,n) mpn_tdiv_qr((q),(r),0,(u),(m),(v),(n))
+#define zd_divmod(q,r,u,m,v,n) ({ mpn_tdiv_qr((q),(r),0,(u),(m),(v),(n)); true; })
 #define zd_xor_n mpn_xor_n
