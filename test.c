@@ -19,8 +19,7 @@ typedef z_res (*z_bin_t)(z_int, z_int);
 static gmp_randstate_t randstate;
 
 static z_int mpz_to_z(mpz_srcptr in) {
-    z_int out = { .neg = mpz_sgn(in) < 0, .size = _z_digits((z_size)(mpz_size(in) * GMP_NUMB_BITS)) };
-    out.alloc = out.size;
+    z_int out = { .neg = mpz_sgn(in) < 0, .size = _z_digits((z_size)(mpz_size(in) * GMP_NUMB_BITS)), .alloc = true };
     out.d = calloc((size_t)out.size, sizeof (z_digit));
     mpz_export(out.d, 0, -1, Z_BITS/8, 0, 0, in);
     _z_trim(&out);

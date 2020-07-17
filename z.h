@@ -31,7 +31,7 @@
 typedef struct {
     z_digit* d;    // digits
     z_size size;   // number of digits
-    z_size alloc;  // allocated digits
+    bool alloc;    // memory allocated
     bool neg;      // integer is negative
     bool err;      // allocation failed
 } z_int;
@@ -58,7 +58,7 @@ _z_inl _z_wu int32_t z_cmp(z_int a, z_int b) {
 
 _z_inl z_res z_move(z_int* a) {
     z_int m = *a;
-    a->alloc = 0;
+    a->alloc = false;
     return z_ok(m);
 }
 
@@ -74,7 +74,7 @@ _z_inl _z_wu z_res _z_new(bool neg, z_size size, z_size alloc) {
         if (_z_unlikely(!digit))
             return z_err;
     }
-    return z_ok((z_int){ .neg = neg, .size = size, .alloc = alloc, .d = digit });
+    return z_ok((z_int){ .neg = neg, .size = size, .alloc = !!alloc, .d = digit });
 }
 
 _z_inl void _z_grow(z_int* a, z_digit b) {
@@ -361,14 +361,13 @@ _z_inl _z_wu z_res z_or(z_int a, z_int b) {
 }
 
 _z_inl _z_wu z_int z_abs(z_int a) {
-    a.neg = false;
-    a.alloc = 0;
+    a.neg = a.alloc = false;
     return a;
 }
 
 _z_inl _z_wu z_int z_neg(z_int a) {
     a.neg = !a.neg && a.size;
-    a.alloc = 0;
+    a.alloc = false;
     return a;
 }
 
@@ -402,8 +401,8 @@ _z_inl _z_wu uint64_t z_to_u64(z_int a) {
     return a.neg ? (uint64_t)(-(int64_t)b) : b;
 }
 
-_z_inl _z_wu z_res z_from_u64(uint64_t b) {
-    z_int r = z_chk(_z_new(false, 0, _z_digits(64)));
+_z_inl _z_wu z_int z_from_u64_noalloc(uint64_t b, uint64_t* d) {
+    z_int r = { .d = (z_digit*)d };
     uint64_t mask = 64 <= Z_BITS ? ~(uint64_t)0 : ((uint64_t)1 << (64 <= Z_BITS ? 0 : Z_BITS)) - 1;
     while (b) {
         r.d[r.size++] = (z_digit)(b & mask);
@@ -411,12 +410,24 @@ _z_inl _z_wu z_res z_from_u64(uint64_t b) {
             break;
         b >>= 64 <= Z_BITS ? 0 : Z_BITS;
     }
+    return r;
+}
+
+_z_inl _z_wu z_res z_from_u64(uint64_t b) {
+    z_int r = z_from_u64_noalloc(b, (uint64_t*)z_chk(_z_new(false, 0, _z_digits(64))).d);
+    r.alloc = true;
     return z_ok(r);
 }
 
-_z_inl _z_wu z_res z_from_i64(int64_t b) {
-    z_int r = z_chk(z_from_u64(b < 0 ? -(uint64_t)b : (uint64_t)b));
+_z_inl _z_wu z_int z_from_i64_noalloc(int64_t b, uint64_t* d) {
+    z_int r = z_from_u64_noalloc(b < 0 ? -(uint64_t)b : (uint64_t)b, d);
     r.neg = b < 0;
+    return r;
+}
+
+_z_inl _z_wu z_res z_from_i64(int64_t b) {
+    z_int r = z_from_i64_noalloc(b, (uint64_t*)z_chk(_z_new(false, 0, _z_digits(64))).d);
+    r.alloc = true;
     return z_ok(r);
 }
 
@@ -453,8 +464,8 @@ _z_inl _z_wu z_res z_from_d(double b) {
     if (exp == 0x7FF)
         return z_ok(z_zero); // convention: return 0 for +-inf, NaN
     exp -= 1023 + 52;
-    uint64_t frac = (bits & (((uint64_t)1 << 52) - (uint64_t)1)) | ((uint64_t)1 << 52);
-    z_autochk(f, z_from_u64(frac));
+    uint64_t frac = (bits & (((uint64_t)1 << 52) - (uint64_t)1)) | ((uint64_t)1 << 52), tmp;
+    z_int f = z_from_u64_noalloc(frac, &tmp);
     z_autochk(r, exp < 0 ? z_shr(f, (uint16_t)-exp) : z_shl(f, (uint16_t)exp));
     r.neg = (bits >> 63) && r.size;
     return z_move(&r);
