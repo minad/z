@@ -407,8 +407,8 @@ _z_inl _z_wu uint64_t z_to_u64(z_int a) {
     return a.neg ? (uint64_t)(-(int64_t)b) : b;
 }
 
-_z_inl _z_wu z_int z_from_u64(uint64_t b) {
-    z_int r = _z_new_checked(false, false, 0, _z_digits(64));
+_z_inl _z_wu z_int z_from_u64_noalloc(uint64_t b, uint64_t* d) {
+    z_int r = { .d = (z_digit*)d };
     uint64_t mask = 64 <= Z_BITS ? ~(uint64_t)0 : ((uint64_t)1 << (64 <= Z_BITS ? 0 : Z_BITS)) - 1;
     while (b) {
         r.d[r.size++] = (z_digit)(b & mask);
@@ -419,9 +419,21 @@ _z_inl _z_wu z_int z_from_u64(uint64_t b) {
     return r;
 }
 
-_z_inl _z_wu z_int z_from_i64(int64_t b) {
-    z_int r = z_from_u64(b < 0 ? -(uint64_t)b : (uint64_t)b);
+_z_inl _z_wu z_int z_from_u64(uint64_t b) {
+    z_int r = z_from_u64_noalloc(b, (uint64_t*)_z_new_checked(false, false, 0, _z_digits(64)).d);
+    r.alloc = true;
+    return r;
+}
+
+_z_inl _z_wu z_int z_from_i64_noalloc(int64_t b, uint64_t* d) {
+    z_int r = z_from_u64_noalloc(b < 0 ? -(uint64_t)b : (uint64_t)b, d);
     r.neg = b < 0;
+    return r;
+}
+
+_z_inl _z_wu z_int z_from_i64(int64_t b) {
+    z_int r = z_from_i64_noalloc(b, (uint64_t*)_z_new_checked(false, false, 0, _z_digits(64)).d);
+    r.alloc = true;
     return r;
 }
 
@@ -459,8 +471,8 @@ _z_inl _z_wu z_int z_from_d(double b) {
     if (exp == 0x7FF)
         return z_zero; // convention: return 0 for +-inf, NaN
     exp -= 1023 + 52;
-    uint64_t frac = (bits & (((uint64_t)1 << 52) - (uint64_t)1)) | ((uint64_t)1 << 52);
-    z_int f = z_from_u64(frac),
+    uint64_t frac = (bits & (((uint64_t)1 << 52) - (uint64_t)1)) | ((uint64_t)1 << 52), tmp;
+    z_int f = z_from_u64_noalloc(frac, &tmp),
         r = exp < 0 ? z_shr(f, (uint16_t)-exp) : z_shl(f, (uint16_t)exp);
     z_free(f);
     r.neg = (bits >> 63) && r.size;
