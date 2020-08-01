@@ -26,7 +26,7 @@
 typedef struct {
     z_digit* d;  // digits
     z_size size; // number of digits
-    z_size alloc;  // allocated digits
+    bool alloc;  // memory allocated
     bool neg;    // integer is negative
     bool err;    // true if allocation failed
 } z_int;
@@ -63,7 +63,7 @@ _z_inl _z_wu z_int _z_new(bool err, bool neg, z_size size, z_size alloc) {
         if (_z_unlikely(!digit))
             return z_err;
     }
-    return (z_int){ .neg = neg, .size = size, .alloc = alloc, .d = digit };
+    return (z_int){ .neg = neg, .size = size, .alloc = !!alloc, .d = digit };
 }
 #define _z_new_checked(lasterr, neg, size, alloc)                       \
     ({                                                                  \
@@ -366,14 +366,13 @@ _z_inl _z_wu z_int z_or(z_int a, z_int b) {
 }
 
 _z_inl _z_wu z_int z_abs(z_int a) {
-    a.neg = false;
-    a.alloc = 0;
+    a.neg = a.alloc = false;
     return a;
 }
 
 _z_inl _z_wu z_int z_neg(z_int a) {
     a.neg = !a.neg && a.size;
-    a.alloc = 0;
+    a.alloc = false;
     return a;
 }
 

@@ -7,7 +7,7 @@ API:
 typedef struct {
     z_digit* d;  // digits
     z_size size; // number of digits
-    z_size alloc;  // allocated digits
+    bool alloc;  // memory allocated
     bool neg;    // integer is negative
     bool err;    // true if allocation failed, error is propagated
 } z_int;
