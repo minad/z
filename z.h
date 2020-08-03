@@ -70,7 +70,7 @@ _z_inl void _z_moveptr(z_int** p, z_int* a) {
 _z_inl _z_wu z_res _z_new(bool neg, z_size size, z_size alloc) {
     z_digit* digit = 0;
     if (alloc) {
-        digit = (z_digit*)Z_ALLOC(sizeof (z_digit) * (size_t)alloc);
+        digit = Z_ALLOC(alloc);
         if (_z_unlikely(!digit))
             return z_err;
     }

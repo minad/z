@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define Z_ALLOC(x)  malloc(x)
+#define Z_ALLOC(x)  malloc((size_t)(x) * sizeof (z_digit))
 #define Z_FREE(x)   free(x)
 #define Z_ASSERT(x) assert(x)
 #define Z_SCRATCH   64

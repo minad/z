@@ -236,7 +236,7 @@ _z_inl _z_wu bool _zd_div_knuth(z_digit* q, z_digit* r,
     z_size needed = n + m + 1;
     z_digit scratch[Z_SCRATCH],
         *vn = needed > Z_SCRATCH
-        ? (z_digit*)Z_ALLOC(sizeof (z_digit) * (size_t)needed)
+        ? Z_ALLOC(needed)
         : scratch,
         *un = vn + n;
     if (_z_unlikely(!vn))
