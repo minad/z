@@ -16,6 +16,40 @@ typedef uint16_t _z_ddigit;
 #error Invalid Z_BITS value
 #endif
 
+// TODO provide implementation which does not use _z_ddigit?
+_z_inl void _zd_mul_hl(z_digit a, z_digit b, z_digit* hp, z_digit* lp) {
+    _z_ddigit w = (_z_ddigit)a * (_z_ddigit)b;
+    *lp = (z_digit)w;
+    *hp = (z_digit)(w >> Z_BITS);
+}
+
+// TODO provide implementation which does not use _z_ddigit?
+// uint128 div mod synthesises a call to __udivmodti3
+_z_inl void _zd_div_hl(z_digit ah, z_digit al, z_digit b, z_digit* qp, z_digit* rp) {
+    Z_ASSERT(ah <= b);
+    _z_ddigit w = ((_z_ddigit)ah << Z_BITS) | (_z_ddigit)al;
+    *qp = (z_digit)(w / b);
+    *rp = (z_digit)(w % b);
+}
+
+// TODO use __builtin_addc on clang if available
+_z_inl z_digit _zd_add_c(z_digit a, z_digit b, z_digit* c) {
+    z_digit r;
+    z_digit c1 = __builtin_add_overflow(a, b, &r);
+    z_digit c2 = __builtin_add_overflow(r, *c, &r);
+    *c = c1 + c2;
+    return r;
+}
+
+// TODO use __builtin_subc on clang if available
+_z_inl z_digit _zd_sub_c(z_digit a, z_digit b, z_digit* c) {
+    z_digit r;
+    z_digit c1 = __builtin_sub_overflow(a, b, &r);
+    z_digit c2 = __builtin_sub_overflow(r, *c, &r);
+    *c = c1 + c2;
+    return r;
+}
+
 _z_inl z_digit zd_shl(z_digit* r, const z_digit* a, z_size n, unsigned int s) {
     Z_ASSERT(s > 0);
     Z_ASSERT(s < Z_BITS);
@@ -50,51 +84,33 @@ _z_inl int32_t zd_cmp(const z_digit* a, const z_digit* b, z_size n) {
     return 0;
 }
 
-// TODO provide implementation which does not use _z_ddigit?
-_z_inl void _zd_dd_mul(z_digit a, z_digit b, z_digit* hp, z_digit* lp) {
-    _z_ddigit w = (_z_ddigit)a * (_z_ddigit)b;
-    *lp = (z_digit)w;
-    *hp = (z_digit)(w >> Z_BITS);
-}
-
-// TODO provide implementation which does not use _z_ddigit?
-// uint128 div mod synthesises a call to __udivmodti3
-_z_inl void _zd_dd_div(z_digit ah, z_digit al, z_digit b, z_digit* qp, z_digit* rp) {
-    Z_ASSERT(ah <= b);
-    _z_ddigit w = ((_z_ddigit)ah << Z_BITS) | (_z_ddigit)al;
-    *qp = (z_digit)(w / b);
-    *rp = (z_digit)(w % b);
-}
-
 _z_inl z_digit zd_mul_1(z_digit* r, const z_digit* a, z_size n, z_digit b) {
     z_digit c = 0, h, l;
     while (n --> 0) {
-        _zd_dd_mul(*a++, b, &h, &l);
+        _zd_mul_hl(*a++, b, &h, &l);
         c = h + (z_digit)__builtin_add_overflow(c, l, r++);
     }
     return c;
 }
 
 _z_inl z_digit zd_submul_1(z_digit* r, const z_digit* a, z_size n, z_digit b) {
-    z_digit c = 0, h, l;
+    z_digit c = 0, h, l, t;
     while (n --> 0) {
-        _zd_dd_mul(*a++, b, &h, &l);
-        z_digit c1 = __builtin_sub_overflow(*r, l, &l);
-        z_digit c2 = __builtin_sub_overflow(l, c, r);
-        c = h + c1 + c2;
-        ++r;
+        _zd_mul_hl(*a++, b, &h, &l);
+        t = _zd_sub_c(*r, l, &c);
+        *r++ = t;
+        c += h;
     }
     return c;
 }
 
 _z_inl z_digit zd_addmul_1(z_digit* r, const z_digit* a, z_size n, z_digit b) {
-    z_digit c = 0, h, l;
+    z_digit c = 0, h, l, t;
     while (n --> 0) {
-        _zd_dd_mul(*a++, b, &h, &l);
-        z_digit c1 = __builtin_add_overflow(*r, l, &l);
-        z_digit c2 = __builtin_add_overflow(l, c, r);
-        c = h + c1 + c2;
-        ++r;
+        _zd_mul_hl(*a++, b, &h, &l);
+        t = _zd_add_c(*r, l, &c);
+        *r++ = t;
+        c += h;
     }
     return c;
 }
@@ -130,12 +146,8 @@ _z_inl z_digit zd_sub_1(z_digit* r, const z_digit* a, z_size n, z_digit b) {
 
 _z_inl z_digit zd_add_n(z_digit* r, const z_digit* a, const z_digit* b, z_size n) {
     z_digit c = 0;
-    while (n --> 0) {
-        z_digit c1 = __builtin_add_overflow(*a++, *b++, r);
-        z_digit c2 = __builtin_add_overflow(*r, c, r);
-        c = c1 + c2;
-        ++r;
-    }
+    while (n --> 0)
+        *r++ = _zd_add_c(*a++, *b++, &c);
     return c;
 }
 
@@ -147,12 +159,8 @@ _z_inl z_digit zd_add(z_digit* r, const z_digit* a, z_size n, const z_digit* b, 
 
 _z_inl z_digit zd_sub_n(z_digit* r, const z_digit* a, const z_digit* b, z_size n) {
     z_digit c = 0;
-    while (n --> 0) {
-        z_digit c1 = __builtin_sub_overflow(*a++, *b++, r);
-        z_digit c2 = __builtin_sub_overflow(*r, c, r);
-        c = c1 + c2;
-        ++r;
-    }
+    while (n --> 0)
+        *r++ = _zd_sub_c(*a++, *b++, &c);
     return c;
 }
 
@@ -185,7 +193,7 @@ _z_inl void zd_xor_n(z_digit* r, const z_digit* a, const z_digit* b, z_size n) {
 _z_inl z_digit _zd_div_1(z_digit* q, const z_digit* u, z_size m, z_digit v) {
     z_digit c = 0;
     while (m --> 0)
-        _zd_dd_div(c, u[m], v, q + m, &c);
+        _zd_div_hl(c, u[m], v, q + m, &c);
     return c;
 }
 
@@ -193,12 +201,12 @@ _z_inl void _zd_div_knuth_step(z_digit* q, z_digit* u, z_digit* v, z_size n, z_s
     // Estimate Q of q[j]
     z_digit Q, R, h, l;
     bool Qh = u[j + n] == v[n - 1];
-    _zd_dd_div(u[j + n], u[j + n - 1], v[n - 1], &Q, &R);
+    _zd_div_hl(u[j + n], u[j + n - 1], v[n - 1], &Q, &R);
 
     // Calculate Q
     do {
         if (!Qh)   {
-            _zd_dd_mul(Q, v[n - 2], &h, &l);
+            _zd_mul_hl(Q, v[n - 2], &h, &l);
             if (h < R || (h == R && l <= u[j + n - 2]))
                 break;
         }
