@@ -19,7 +19,7 @@ typedef z_res (*z_bin_t)(z_int, z_int);
 static gmp_randstate_t randstate;
 
 static z_int mpz_to_z(mpz_srcptr in) {
-    z_int out = { .neg = mpz_sgn(in) < 0, .size = _z_digits((z_size)(mpz_size(in) * GMP_NUMB_BITS)), .alloc = true };
+    z_int out = { .neg = mpz_sgn(in) < 0, .size = _z_digits((z_size)(mpz_size(in) * GMP_NUMB_BITS)) };
     out.d = calloc((size_t)out.size, sizeof (z_digit));
     mpz_export(out.d, 0, -1, Z_BITS/8, 0, 0, in);
     _z_trim(&out);
@@ -46,7 +46,7 @@ static void check_bin(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t f2, 
     z_auto(r2, mpz_to_z(r1));
     z_auto(u2, f2(a2, b2).z);
 
-    if (u2.err) {
+    if (!u2.d) {
         gmp_printf("%s failed\n", name);
     } else if (z_cmp(u2, r2) != 0) {
         mpz_t u1;

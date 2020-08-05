@@ -239,7 +239,7 @@ _z_inl _z_wu bool _zd_div_knuth(z_digit* q, z_digit* r,
         ? Z_ALLOC(needed)
         : scratch,
         *un = vn + n;
-    if (_z_unlikely(!vn))
+    if (!vn)
         return false;
 
     // Normalize

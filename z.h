@@ -5,7 +5,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#define _z_unlikely(x)  __builtin_expect(!!(x), false)
 #define _z_inl          static inline __attribute__((always_inline))
 #define _z_wu           __attribute__ ((warn_unused_result))
 #define _z_swap(a, b)   ({ typeof(a) _z_swap = a; a = b; b = _z_swap; })
@@ -14,12 +13,11 @@
 #define _z_digits(n)    (((n) + Z_BITS - 1) / Z_BITS)
 #define _z_cpy(d, s, n) memcpy((d), (s), (size_t)(n) * sizeof (z_digit))
 #define _z_clear(d, n)  memset((d), 0, (size_t)(n) * sizeof (z_digit))
-#define z_zero          ((z_int){.size=0})
+#define z_none          ((z_int){.size=0})
 #define z_auto(x, i)    z_int x __attribute__((cleanup(_z_free))) = (i)
-#define z_autotry(x, i) z_auto(x, z_try(i))
-#define z_try(i)        ({ z_res _z_try = (i); if (_z_try.z.err) return z_err; _z_try.z; })
-#define z_trybool(i)    ({ z_res _z_trybool = (i); if (_z_trybool.z.err) return false; _z_trybool.z; })
-#define z_err           ((z_res){{.err=true}})
+#define z_try(i)        ({ z_res _z_try = (i); if (!_z_try.z.d) return _z_try; _z_try.z; })
+#define z_trybool(i)    ({ z_res _z_trybool = (i); if (!_z_trybool.z.d) return false; _z_trybool.z; })
+#define z_err           ((z_res){{.d=0}})
 #define z_ok(...)       ((z_res){__VA_ARGS__})
 
 #if Z_GMP
@@ -31,9 +29,7 @@
 typedef struct {
     z_digit* d;    // digits
     z_size size;   // number of digits
-    bool alloc;    // memory allocated
     bool neg;      // integer is negative
-    bool err;      // allocation failed
 } z_int;
 
 typedef struct {
@@ -41,7 +37,7 @@ typedef struct {
 } z_res;
 
 _z_inl void _z_free(z_int* a) {
-    if (a->alloc)
+    if (a->d)
         Z_FREE(a->d);
 }
 
@@ -56,25 +52,16 @@ _z_inl _z_wu int32_t z_cmp(z_int a, z_int b) {
     return cmp ? (cmp > 0 ? 1 : -1) : 0;
 }
 
-_z_inl z_res z_move(z_int* a) {
-    z_int m = *a;
-    a->alloc = false;
-    return z_ok(m);
-}
-
-_z_inl void _z_moveptr(z_int** p, z_int* a) {
-    if (*p)
-        **p = z_move(a).z;
+_z_inl void _z_move(z_int** p, z_int* a) {
+    if (*p) {
+        Z_ASSERT(a->d);
+        **p = *a;
+        a->d = 0;
+    }
 }
 
 _z_inl _z_wu z_res _z_new(bool neg, z_size size, z_size alloc) {
-    z_digit* digit = 0;
-    if (alloc) {
-        digit = Z_ALLOC(alloc);
-        if (_z_unlikely(!digit))
-            return z_err;
-    }
-    return z_ok((z_int){ .neg = neg, .size = size, .alloc = !!alloc, .d = digit });
+    return (z_res){{ .neg = neg, .size = size, .d = Z_ALLOC(alloc) }};
 }
 
 _z_inl void _z_grow(z_int* a, z_digit b) {
@@ -96,12 +83,12 @@ _z_inl void _z_trim_1(z_int* a) {
 }
 
 _z_inl _z_wu z_res _z_addsub_1(z_int a, z_digit b, bool aneg, bool bneg) {
-    z_autotry(r, _z_new(aneg, a.size, a.size + 1));
+    z_int r = z_try(_z_new(aneg, a.size, a.size + 1));
     if (!a.size) {
         r.d[0] = b;
         r.neg = bneg;
         r.size = 1;
-        return z_move(&r);
+        return z_ok(r);
     }
 
     if (aneg == bneg) {
@@ -114,7 +101,7 @@ _z_inl _z_wu z_res _z_addsub_1(z_int a, z_digit b, bool aneg, bool bneg) {
         _z_trim(&r);
     }
 
-    return z_move(&r);
+    return z_ok(r);
 }
 
 _z_inl _z_wu z_res z_add_1(z_int a, z_digit b) {
@@ -134,7 +121,7 @@ _z_inl _z_wu z_res _z_addsub(z_int a, z_int b, bool aneg, bool bneg) {
     if (b.size == 1)
         return _z_addsub_1(a, b.d[0], aneg, bneg);
 
-    z_autotry(r, _z_new(aneg, a.size, a.size + 1));
+    z_int r = z_try(_z_new(aneg, a.size, a.size + 1));
     if (aneg == bneg) {
         _z_grow(&r, zd_add(r.d, a.d, a.size, b.d, b.size));
     } else if (a.size != b.size) {
@@ -149,7 +136,7 @@ _z_inl _z_wu z_res _z_addsub(z_int a, z_int b, bool aneg, bool bneg) {
         _z_trim(&r);
     }
 
-    return z_move(&r);
+    return z_ok(r);
 }
 
 _z_inl _z_wu z_res z_sub(z_int a, z_int b) {
@@ -169,7 +156,7 @@ _z_inl _z_wu z_res z_mul(z_int a, z_int b) {
         _z_swap(a, b);
     if (!b.size)
         return _z_new(false, 0, 0);
-    z_autotry(r, _z_new(a.neg != b.neg, a.size + b.size, a.size + b.size));
+    z_int r = z_try(_z_new(a.neg != b.neg, a.size + b.size, a.size + b.size));
     if (_z_identical(a, b)) {
         zd_sqr(r.d, a.d, a.size);
         _z_trim_1(&r);
@@ -179,7 +166,7 @@ _z_inl _z_wu z_res z_mul(z_int a, z_int b) {
     } else {
         r.size -= !zd_mul(r.d, a.d, a.size, b.d, b.size);
     }
-    return z_move(&r);
+    return z_ok(r);
 }
 
 _z_inl _z_wu bool z_quorem(z_int* qp, z_int* rp, z_int a, z_int b) {
@@ -203,8 +190,8 @@ _z_inl _z_wu bool z_quorem(z_int* qp, z_int* rp, z_int a, z_int b) {
                 q.neg = false;
         }
     }
-    _z_moveptr(&qp, &q);
-    _z_moveptr(&rp, &r);
+    _z_move(&qp, &q);
+    _z_move(&rp, &r);
     return true;
 }
 
@@ -217,18 +204,18 @@ _z_inl _z_wu z_res z_rem(z_int a, z_int b) {
 }
 
 _z_inl _z_wu bool z_divmod(z_int* dp, z_int* mp, z_int a, z_int b) {
-    z_auto(q, z_zero);
-    z_auto(r, z_zero);
+    z_auto(q, z_none);
+    z_auto(r, z_none);
     if (!z_quorem(&q, &r, a, b))
         return false;
     if (r.size && a.neg != b.neg) {
-        if (dp)
-            *dp = z_trybool(z_sub_1(q, 1));
-        if (mp)
-            *mp = z_trybool(z_add(r, b));
+        z_auto(d, dp ? z_trybool(z_sub_1(q, 1)) : z_none);
+        z_auto(m, mp ? z_trybool(z_add(r, b)) : z_none);
+        _z_move(&dp, &d);
+        _z_move(&mp, &m);
     } else {
-        _z_moveptr(&dp, &q);
-        _z_moveptr(&mp, &r);
+        _z_move(&dp, &q);
+        _z_move(&mp, &r);
     }
     return true;
 }
@@ -244,54 +231,54 @@ _z_inl _z_wu z_res z_mod(z_int a, z_int b) {
 _z_inl _z_wu z_res _z_unsigned_xor(z_int a, z_int b) {
     if (a.size < b.size)
         _z_swap(a, b);
-    z_autotry(r, _z_new(false, a.size, a.size));
+    z_int r = z_try(_z_new(false, a.size, a.size));
     if (b.size)
         zd_xor_n(r.d, a.d, b.d, b.size);
     if (a.size > b.size)
         _z_cpy(r.d + b.size, a.d + b.size, a.size - b.size);
     else
         _z_trim(&r);
-    return z_move(&r);
+    return z_ok(r);
 }
 
 _z_inl _z_wu z_res _z_unsigned_and(z_int a, z_int b) {
     z_size size = _z_min(a.size, b.size);
-    z_autotry(r, _z_new(false, size, size));
+    z_int r = z_try(_z_new(false, size, size));
     if (r.size) {
         zd_and_n(r.d, a.d, b.d, r.size);
         _z_trim(&r);
     }
-    return z_move(&r);
+    return z_ok(r);
 }
 
 _z_inl _z_wu z_res _z_unsigned_andnot(z_int a, z_int b) {
-    z_autotry(r, _z_new(false, a.size, a.size));
+    z_int r = z_try(_z_new(false, a.size, a.size));
     z_size size = _z_min(a.size, b.size);
     if (size)
         zd_andnot_n(r.d, a.d, b.d, size);
     if (size < a.size)
         _z_cpy(r.d + size, a.d + size, a.size - size);
     _z_trim(&r);
-    return z_move(&r);
+    return z_ok(r);
 }
 
 _z_inl _z_wu z_res _z_unsigned_or(z_int a, z_int b) {
     if (a.size < b.size)
         _z_swap(a, b);
-    z_autotry(r, _z_new(false, a.size, a.size));
+    z_int r = z_try(_z_new(false, a.size, a.size));
     if (b.size)
         zd_or_n(r.d, a.d, b.d, b.size);
     if (a.size > b.size)
         _z_cpy(r.d + b.size, a.d + b.size, a.size - b.size);
-    return z_move(&r);
+    return z_ok(r);
 }
 
 _z_inl _z_wu z_res _z_unsigned_dec(z_int a) {
     Z_ASSERT(a.size);
-    z_autotry(r, _z_new(false, a.size, a.size + 1));
+    z_int r = z_try(_z_new(false, a.size, a.size + 1));
     zd_sub_1(r.d, a.d, a.size, 1);
     _z_trim(&r);
-    return z_move(&r);
+    return z_ok(r);
 }
 
 _z_inl _z_wu z_res z_xor(z_int a, z_int b) {
@@ -301,18 +288,16 @@ _z_inl _z_wu z_res z_xor(z_int a, z_int b) {
     if (a.neg)
         _z_swap(a, b);
 
-    z_autotry(x, _z_unsigned_dec(b));
-    z_auto(y, z_zero);
-    z_auto(r, z_zero);
+    z_auto(x, z_try(_z_unsigned_dec(b)));
     if (a.neg && b.neg) {
-        y = z_try(_z_unsigned_dec(a));
-        r = z_try(_z_unsigned_xor(x, y));
-    } else {
-        y = z_try(_z_unsigned_xor(a, x));
-        r = z_try(z_add_1(y, 1));
-        r.neg = true;
+        z_auto(y, z_try(_z_unsigned_dec(a)));
+        return _z_unsigned_xor(x, y);
     }
-    return z_move(&r);
+
+    z_auto(y, z_try(_z_unsigned_xor(a, x)));
+    z_int r = z_try(z_add_1(y, 1));
+    r.neg = true;
+    return z_ok(r);
 }
 
 _z_inl _z_wu z_res z_and(z_int a, z_int b) {
@@ -322,19 +307,16 @@ _z_inl _z_wu z_res z_and(z_int a, z_int b) {
     if (a.neg)
         _z_swap(a, b);
 
-    z_autotry(x, _z_unsigned_dec(b));
-    z_auto(y, z_zero);
-    z_auto(z, z_zero);
-    z_auto(r, z_zero);
+    z_auto(x, z_try(_z_unsigned_dec(b)));
     if (a.neg && b.neg) {
-        y = z_try(_z_unsigned_dec(a));
-        z = z_try(_z_unsigned_or(x, y));
-        r = z_try(z_add_1(z, 1));
+        z_auto(y, z_try(_z_unsigned_dec(a)));
+        z_auto(z, z_try(_z_unsigned_or(x, y)));
+        z_int r = z_try(z_add_1(z, 1));
         r.neg = true;
-    } else {
-        r = z_try(_z_unsigned_andnot(a, x));
+        return z_ok(r);
     }
-    return z_move(&r);
+
+    return _z_unsigned_andnot(a, x);
 }
 
 _z_inl _z_wu z_res z_or(z_int a, z_int b) {
@@ -344,49 +326,23 @@ _z_inl _z_wu z_res z_or(z_int a, z_int b) {
     if (a.neg)
         _z_swap(a, b);
 
-    z_autotry(x, _z_unsigned_dec(b));
-    z_auto(y, z_zero);
-    z_auto(z, z_zero);
-    z_auto(r, z_zero);
+    z_auto(x, z_try(_z_unsigned_dec(b)));
+    z_int r;
     if (a.neg && b.neg) {
-        y = z_try(_z_unsigned_dec(a));
-        z = z_try(_z_unsigned_and(x, y));
+        z_auto(y, z_try(_z_unsigned_dec(a)));
+        z_auto(z, z_try(_z_unsigned_and(x, y)));
         r = z_try(z_add_1(z, 1));
     } else {
-        y = z_try(_z_unsigned_andnot(x, a));
+        z_auto(y, z_try(_z_unsigned_andnot(x, a)));
         r = z_try(z_add_1(y, 1));
     }
     r.neg = true;
-    return z_move(&r);
-}
-
-_z_inl _z_wu z_int z_abs(z_int a) {
-    a.neg = a.alloc = false;
-    return a;
-}
-
-_z_inl _z_wu z_int z_neg(z_int a) {
-    a.neg = !a.neg && a.size;
-    a.alloc = false;
-    return a;
+    return z_ok(r);
 }
 
 _z_inl _z_wu z_res z_not(z_int a) {
-    return z_sub_1(z_neg(a), 1);
-}
-
-_z_inl _z_wu z_res z_shl(z_int a, uint16_t b) {
-    if (!a.size)
-        return _z_new(false, 0, 0);
-    z_size n = b / Z_BITS;
-    z_autotry(r, _z_new(a.neg, a.size + n, a.size + n + 1));
-    b %= Z_BITS;
-    if (b)
-        _z_grow(&r, zd_shl(r.d + n, a.d, a.size, b));
-    else
-        _z_cpy(r.d + n, a.d, a.size);
-    _z_clear(r.d, n);
-    return z_move(&r);
+    a.neg = !a.neg && a.size; // negate
+    return z_sub_1(a, 1);
 }
 
 _z_inl _z_wu uint64_t z_to_u64(z_int a) {
@@ -414,9 +370,7 @@ _z_inl _z_wu z_int z_from_u64_noalloc(uint64_t b, uint64_t* d) {
 }
 
 _z_inl _z_wu z_res z_from_u64(uint64_t b) {
-    z_int r = z_from_u64_noalloc(b, (uint64_t*)z_try(_z_new(false, 0, _z_digits(64))).d);
-    r.alloc = true;
-    return z_ok(r);
+    return z_ok(z_from_u64_noalloc(b, (uint64_t*)z_try(_z_new(false, 0, _z_digits(64))).d));
 }
 
 _z_inl _z_wu z_int z_from_i64_noalloc(int64_t b, uint64_t* d) {
@@ -426,8 +380,20 @@ _z_inl _z_wu z_int z_from_i64_noalloc(int64_t b, uint64_t* d) {
 }
 
 _z_inl _z_wu z_res z_from_i64(int64_t b) {
-    z_int r = z_from_i64_noalloc(b, (uint64_t*)z_try(_z_new(false, 0, _z_digits(64))).d);
-    r.alloc = true;
+    return z_ok(z_from_i64_noalloc(b, (uint64_t*)z_try(_z_new(false, 0, _z_digits(64))).d));
+}
+
+_z_inl _z_wu z_res z_shl(z_int a, uint16_t b) {
+    if (!a.size)
+        return _z_new(false, 0, 0);
+    z_size n = b / Z_BITS;
+    z_int r = z_try(_z_new(a.neg, a.size + n, a.size + n + 1));
+    b %= Z_BITS;
+    if (b)
+        _z_grow(&r, zd_shl(r.d + n, a.d, a.size, b));
+    else
+        _z_cpy(r.d + n, a.d, a.size);
+    _z_clear(r.d, n);
     return z_ok(r);
 }
 
@@ -437,7 +403,7 @@ _z_inl _z_wu z_res z_shr(z_int a, uint16_t b) {
         return z_from_i64(-1);
     if (!a.size || a.size <= n)
         return _z_new(false, 0, 0);
-    z_autotry(r, _z_new(a.neg, a.size - n, a.size - n));
+    z_int r = z_try(_z_new(a.neg, a.size - n, a.size - n));
     b %= Z_BITS;
     if (b) {
         zd_shr(r.d, a.d + n, r.size, b);
@@ -445,7 +411,7 @@ _z_inl _z_wu z_res z_shr(z_int a, uint16_t b) {
     } else {
         _z_cpy(r.d, a.d + n, r.size);
     }
-    return z_move(&r);
+    return z_ok(r);
 }
 
 _z_inl _z_wu double z_to_d(z_int a) {
@@ -462,13 +428,13 @@ _z_inl _z_wu z_res z_from_d(double b) {
     memcpy(&bits, &b, sizeof (bits));
     int32_t exp = (int32_t)((bits >> 52) & 0x7FF);
     if (exp == 0x7FF)
-        return z_ok(z_zero); // convention: return 0 for +-inf, NaN
+        return _z_new(false, 0, 0); // convention: return 0 for +-inf, NaN
     exp -= 1023 + 52;
     uint64_t frac = (bits & (((uint64_t)1 << 52) - (uint64_t)1)) | ((uint64_t)1 << 52), tmp;
-    z_int f = z_from_u64_noalloc(frac, &tmp);
-    z_autotry(r, exp < 0 ? z_shr(f, (uint16_t)-exp) : z_shl(f, (uint16_t)exp));
+    z_int f = z_from_u64_noalloc(frac, &tmp),
+        r = z_try(exp < 0 ? z_shr(f, (uint16_t)-exp) : z_shl(f, (uint16_t)exp));
     r.neg = (bits >> 63) && r.size;
-    return z_move(&r);
+    return z_ok(r);
 }
 
 _z_inl _z_wu z_res z_from_b(const uint8_t *buf, size_t size) {
