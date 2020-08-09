@@ -105,12 +105,28 @@ _z_inl _z_wu z_res _z_addsub_1(z_int a, z_digit b, bool aneg, bool bneg) {
     return z_ok(r);
 }
 
-_z_local _z_wu z_res z_add_1(z_int a, z_digit b) {
+_z_inl _z_wu z_res _z_add_1(z_int a, z_digit b) {
     return _z_addsub_1(a, b, a.neg, false);
 }
 
-_z_local _z_wu z_res z_sub_1(z_int a, z_digit b) {
+_z_inl _z_wu z_res _z_sub_1(z_int a, z_digit b) {
     return _z_addsub_1(a, b, a.neg, true);
+}
+
+_z_local _z_wu z_res _z_inc(z_int a) {
+    return _z_add_1(a, 1);
+}
+
+_z_local _z_wu z_res _z_dec(z_int a) {
+    return _z_sub_1(a, 1);
+}
+
+_z_local _z_wu z_res z_add_1(z_int a, z_digit b) {
+    return _z_add_1(a, b);
+}
+
+_z_local _z_wu z_res z_sub_1(z_int a, z_digit b) {
+    return _z_sub_1(a, b);
 }
 
 _z_inl _z_wu z_res _z_addsub(z_int a, z_int b, bool aneg, bool bneg) {
@@ -210,7 +226,7 @@ _z_local _z_wu bool z_divmod(z_int* dp, z_int* mp, z_int a, z_int b) {
     if (!z_quorem(&q, &r, a, b))
         return false;
     if (r.size && a.neg != b.neg) {
-        z_auto(d, dp ? z_trybool(z_sub_1(q, 1)) : z_none);
+        z_auto(d, dp ? z_trybool(_z_dec(q)) : z_none);
         z_auto(m, mp ? z_trybool(z_add(r, b)) : z_none);
         _z_move(&dp, &d);
         _z_move(&mp, &m);
@@ -296,7 +312,7 @@ _z_local _z_wu z_res z_xor(z_int a, z_int b) {
     }
 
     z_auto(y, z_try(_z_unsigned_xor(a, x)));
-    z_int r = z_try(z_add_1(y, 1));
+    z_int r = z_try(_z_inc(y));
     r.neg = true;
     return z_ok(r);
 }
@@ -312,7 +328,7 @@ _z_local _z_wu z_res z_and(z_int a, z_int b) {
     if (a.neg && b.neg) {
         z_auto(y, z_try(_z_unsigned_dec(a)));
         z_auto(z, z_try(_z_unsigned_or(x, y)));
-        z_int r = z_try(z_add_1(z, 1));
+        z_int r = z_try(_z_inc(z));
         r.neg = true;
         return z_ok(r);
     }
@@ -332,10 +348,10 @@ _z_local _z_wu z_res z_or(z_int a, z_int b) {
     if (a.neg && b.neg) {
         z_auto(y, z_try(_z_unsigned_dec(a)));
         z_auto(z, z_try(_z_unsigned_and(x, y)));
-        r = z_try(z_add_1(z, 1));
+        r = z_try(_z_inc(z));
     } else {
         z_auto(y, z_try(_z_unsigned_andnot(x, a)));
-        r = z_try(z_add_1(y, 1));
+        r = z_try(_z_inc(y));
     }
     r.neg = true;
     return z_ok(r);
@@ -343,7 +359,7 @@ _z_local _z_wu z_res z_or(z_int a, z_int b) {
 
 _z_local _z_wu z_res z_not(z_int a) {
     a.neg = !a.neg && a.size; // negate
-    return z_sub_1(a, 1);
+    return _z_dec(a);
 }
 
 _z_local _z_wu uint64_t z_to_u64(z_int a) {
