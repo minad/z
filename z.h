@@ -16,10 +16,11 @@
 #define _z_clear(d, n)  memset((d), 0, (size_t)(n) * sizeof (z_digit))
 #define z_none          ((z_int){.size=0})
 #define z_auto(x, i)    z_int x __attribute__((cleanup(_z_free))) = (i)
-#define z_try(i)        ({ z_res _z_try = (i); if (!_z_try.z.d) return _z_try; _z_try.z; })
-#define z_trybool(i)    ({ z_res _z_trybool = (i); if (!_z_trybool.z.d) return false; _z_trybool.z; })
-#define z_err           ((z_res){{.d=0}})
+#define z_tryx(i, ...)  ({ z_res _z_try = (i); if (!_z_try.z.d) {__VA_ARGS__;}; _z_try.z; })
+#define z_try(i)        z_tryx(i, return _z_try)
+#define z_trybool(i)    z_tryx(i, return false)
 #define z_ok(i)         ((z_res){i})
+#define z_err           ((z_res){{.d=0}})
 
 #if Z_GMP
 #  include "zgmp.h"
