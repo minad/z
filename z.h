@@ -19,7 +19,7 @@
 #define z_try(i)        ({ z_res _z_try = (i); if (!_z_try.z.d) return _z_try; _z_try.z; })
 #define z_trybool(i)    ({ z_res _z_trybool = (i); if (!_z_trybool.z.d) return false; _z_trybool.z; })
 #define z_err           ((z_res){{.d=0}})
-#define z_ok(...)       ((z_res){__VA_ARGS__})
+#define z_ok(i)         ((z_res){i})
 
 #if Z_GMP
 #  include "zgmp.h"
