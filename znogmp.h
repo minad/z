@@ -32,24 +32,6 @@ _z_inl void _zd_div_hl(z_digit ah, z_digit al, z_digit b, z_digit* qp, z_digit* 
     *rp = (z_digit)(w % b);
 }
 
-// TODO use __builtin_addc on clang if available
-_z_inl z_digit _zd_add_c(z_digit a, z_digit b, z_digit* c) {
-    z_digit r;
-    z_digit c1 = __builtin_add_overflow(a, b, &r);
-    z_digit c2 = __builtin_add_overflow(r, *c, &r);
-    *c = c1 + c2;
-    return r;
-}
-
-// TODO use __builtin_subc on clang if available
-_z_inl z_digit _zd_sub_c(z_digit a, z_digit b, z_digit* c) {
-    z_digit r;
-    z_digit c1 = __builtin_sub_overflow(a, b, &r);
-    z_digit c2 = __builtin_sub_overflow(r, *c, &r);
-    *c = c1 + c2;
-    return r;
-}
-
 _z_inl z_digit zd_shl(z_digit* r, const z_digit* a, z_size n, unsigned int s) {
     Z_ASSERT(s > 0);
     Z_ASSERT(s < Z_BITS);
@@ -94,23 +76,25 @@ _z_inl z_digit zd_mul_1(z_digit* r, const z_digit* a, z_size n, z_digit b) {
 }
 
 _z_inl z_digit zd_submul_1(z_digit* r, const z_digit* a, z_size n, z_digit b) {
-    z_digit c = 0, h, l, t;
+    z_digit c = 0, h, l;
     while (n --> 0) {
         _zd_mul_hl(*a++, b, &h, &l);
-        t = _zd_sub_c(*r, l, &c);
-        *r++ = t;
-        c += h;
+        z_digit c1 = __builtin_sub_overflow(*r, l, &l);
+        z_digit c2 = __builtin_sub_overflow(l, c, r);
+        c = h + c1 + c2;
+        ++r;
     }
     return c;
 }
 
 _z_inl z_digit zd_addmul_1(z_digit* r, const z_digit* a, z_size n, z_digit b) {
-    z_digit c = 0, h, l, t;
+    z_digit c = 0, h, l;
     while (n --> 0) {
         _zd_mul_hl(*a++, b, &h, &l);
-        t = _zd_add_c(*r, l, &c);
-        *r++ = t;
-        c += h;
+        z_digit c1 = __builtin_add_overflow(*r, l, &l);
+        z_digit c2 = __builtin_add_overflow(l, c, r);
+        c = h + c1 + c2;
+        ++r;
     }
     return c;
 }
@@ -146,8 +130,12 @@ _z_inl z_digit zd_sub_1(z_digit* r, const z_digit* a, z_size n, z_digit b) {
 
 _z_inl z_digit zd_add_n(z_digit* r, const z_digit* a, const z_digit* b, z_size n) {
     z_digit c = 0;
-    while (n --> 0)
-        *r++ = _zd_add_c(*a++, *b++, &c);
+    while (n --> 0) {
+        z_digit c1 = __builtin_add_overflow(*a++, *b++, r);
+        z_digit c2 = __builtin_add_overflow(*r, c, r);
+        c = c1 + c2;
+        ++r;
+    }
     return c;
 }
 
@@ -159,8 +147,12 @@ _z_inl z_digit zd_add(z_digit* r, const z_digit* a, z_size n, const z_digit* b, 
 
 _z_inl z_digit zd_sub_n(z_digit* r, const z_digit* a, const z_digit* b, z_size n) {
     z_digit c = 0;
-    while (n --> 0)
-        *r++ = _zd_sub_c(*a++, *b++, &c);
+    while (n --> 0) {
+        z_digit c1 = __builtin_sub_overflow(*a++, *b++, r);
+        z_digit c2 = __builtin_sub_overflow(*r, c, r);
+        c = c1 + c2;
+        ++r;
+    }
     return c;
 }
 
