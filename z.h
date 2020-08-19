@@ -5,34 +5,54 @@
 #include <stdint.h>
 #include <string.h>
 
-#define _z_inl          static inline __attribute__((always_inline))
-#define _z_static       static __attribute__((unused))
-#define _z_noinl        _z_static __attribute__((noinline))
-#define _z_wu           __attribute__ ((warn_unused_result))
-#define _z_swap(a, b)   ({ typeof(a) _z_swap = a; a = b; b = _z_swap; })
-#define _z_min(a, b)    ({ typeof(a) _z_min1 = (a), _z_min2 = (b); _z_min1 < _z_min2 ? _z_min1 : _z_min2; })
-#define _z_max(a, b)    ({ typeof(a) _z_max1 = (a), _z_max2 = (b); _z_max1 > _z_max2 ? _z_max1 : _z_max2; })
+#define _z_inl    static inline __attribute__((always_inline))
+#define _z_static static __attribute__((unused))
+#define _z_noinl  _z_static __attribute__((noinline))
+#define _z_wu     __attribute__((warn_unused_result))
+#define _z_swap(a, b)          \
+    ({                         \
+        typeof(a) _z_swap = a; \
+        a = b;                 \
+        b = _z_swap;           \
+    })
+#define _z_min(a, b)                            \
+    ({                                          \
+        typeof(a) _z_min1 = (a), _z_min2 = (b); \
+        _z_min1 < _z_min2 ? _z_min1 : _z_min2;  \
+    })
+#define _z_max(a, b)                            \
+    ({                                          \
+        typeof(a) _z_max1 = (a), _z_max2 = (b); \
+        _z_max1 > _z_max2 ? _z_max1 : _z_max2;  \
+    })
 #define _z_digits(n)    (((n) + Z_BITS - 1) / Z_BITS)
-#define _z_cpy(d, s, n) memcpy((d), (s), (size_t)(n) * sizeof (z_digit))
-#define _z_clear(d, n)  memset((d), 0, (size_t)(n) * sizeof (z_digit))
-#define z_none          ((z_int){.size=0})
+#define _z_cpy(d, s, n) memcpy((d), (s), (size_t)(n) * sizeof(z_digit))
+#define _z_clear(d, n)  memset((d), 0, (size_t)(n) * sizeof(z_digit))
+#define z_none          ((z_int){ .size = 0 })
 #define z_auto(x, i)    z_int x __attribute__((cleanup(_z_free))) = (i)
-#define z_tryx(i, ...)  ({ z_res _z_try = (i); if (!_z_try.z.d) {__VA_ARGS__;}; _z_try.z; })
-#define z_try(i)        z_tryx(i, return _z_try)
-#define z_trybool(i)    z_tryx(i, return false)
-#define z_ok(i)         ((z_res){i})
-#define z_err           ((z_res){{.d=0}})
+#define z_tryx(i, ...)      \
+    ({                      \
+        z_res _z_try = (i); \
+        if (!_z_try.z.d) {  \
+            __VA_ARGS__;    \
+        };                  \
+        _z_try.z;           \
+    })
+#define z_try(i)     z_tryx(i, return _z_try)
+#define z_trybool(i) z_tryx(i, return false)
+#define z_ok(i)      ((z_res){ i })
+#define z_err        ((z_res){ { .d = 0 } })
 
 #if Z_GMP
-#  include "zgmp.h"
+    #include "zgmp.h"
 #else
-#  include "znogmp.h"
+    #include "znogmp.h"
 #endif
 
 typedef struct {
-    z_digit* d;    // digits
-    z_size size;   // number of digits
-    bool neg;      // integer is negative
+    z_digit* d;  // digits
+    z_size size; // number of digits
+    bool neg;    // integer is negative
 } z_int;
 
 typedef struct {
@@ -64,7 +84,7 @@ _z_inl void _z_move(z_int** p, z_int* a) {
 }
 
 _z_inl _z_wu z_res _z_new(bool neg, z_size size, z_size alloc) {
-    return (z_res){{ .neg = neg, .size = size, .d = Z_ALLOC(alloc) }};
+    return (z_res){ { .neg = neg, .size = size, .d = Z_ALLOC(alloc) } };
 }
 
 _z_inl void _z_grow(z_int* a, z_digit b) {
@@ -444,23 +464,23 @@ _z_static _z_wu double z_to_d(z_int a) {
 
 _z_static _z_wu z_res z_from_d(double b) {
     uint64_t bits;
-    memcpy(&bits, &b, sizeof (bits));
+    memcpy(&bits, &b, sizeof(bits));
     int32_t exp = (int32_t)((bits >> 52) & 0x7FF);
     if (exp == 0x7FF)
         return _z_new(false, 0, 0); // convention: return 0 for +-inf, NaN
     exp -= 1023 + 52;
     uint64_t frac = (bits & (((uint64_t)1 << 52) - (uint64_t)1)) | ((uint64_t)1 << 52), tmp;
     z_int f = z_from_u64_noalloc(frac, &tmp),
-        r = z_try(exp < 0 ? z_shr(f, (uint16_t)-exp) : z_shl(f, (uint16_t)exp));
+          r = z_try(exp < 0 ? z_shr(f, (uint16_t)-exp) : z_shl(f, (uint16_t)exp));
     r.neg = (bits >> 63) && r.size;
     return z_ok(r);
 }
 
-_z_static _z_wu z_res z_from_b(const uint8_t *buf, size_t size) {
+_z_static _z_wu z_res z_from_b(const uint8_t* buf, size_t size) {
     Z_ASSERT(size);
     z_int r = z_try(_z_new(false, 0, (z_size)_z_digits(8 * size)));
     z_digit c = 0;
-    for (size_t s = 0, i = size; i --> 0; ) {
+    for (size_t s = 0, i = size; i --> 0;) {
         if (!s) {
             Z_ASSERT((size_t)r.size < _z_digits(8 * size));
             ++r.size;

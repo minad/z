@@ -13,7 +13,7 @@ typedef uint32_t _z_ddigit;
 typedef uint8_t z_digit;
 typedef uint16_t _z_ddigit;
 #else
-#error Invalid Z_BITS value
+    #error Invalid Z_BITS value
 #endif
 
 // TODO provide implementation which does not use _z_ddigit?
@@ -197,7 +197,7 @@ _z_inl void _zd_div_knuth_step(z_digit* q, z_digit* u, z_digit* v, z_size n, z_s
 
     // Calculate Q
     do {
-        if (!Qh)   {
+        if (!Qh) {
             _zd_mul_hl(Q, v[n - 2], &h, &l);
             if (h < R || (h == R && l <= u[j + n - 2]))
                 break;
@@ -216,8 +216,7 @@ _z_inl void _zd_div_knuth_step(z_digit* q, z_digit* u, z_digit* v, z_size n, z_s
 }
 
 // Knuth's algorithm D, adapted from Hacker's Delight by Warren
-_z_inl _z_wu bool _zd_div_knuth(z_digit* q, z_digit* r,
-                                const z_digit* u, z_size m,
+_z_inl _z_wu bool _zd_div_knuth(z_digit* q, z_digit* r, const z_digit* u, z_size m,
                                 const z_digit* v, z_size n) {
     Z_ASSERT(m >= n);
     Z_ASSERT(n > 0);
@@ -226,11 +225,7 @@ _z_inl _z_wu bool _zd_div_knuth(z_digit* q, z_digit* r,
     // Allocate scratch space
     unsigned s = (unsigned)(__builtin_clzll(v[n - 1]) - 8 * (int)sizeof(long long) + Z_BITS);
     z_size needed = n + m + 1;
-    z_digit scratch[Z_SCRATCH],
-        *vn = needed > Z_SCRATCH
-        ? Z_ALLOC(needed)
-        : scratch,
-        *un = vn + n;
+    z_digit scratch[Z_SCRATCH], *vn = needed > Z_SCRATCH ? Z_ALLOC(needed) : scratch, *un = vn + n;
     if (!vn)
         return false;
 
@@ -259,9 +254,8 @@ _z_inl _z_wu bool _zd_div_knuth(z_digit* q, z_digit* r,
     return true;
 }
 
-_z_inl _z_wu bool zd_divmod(z_digit* q, z_digit* r,
-                            const z_digit* u, z_size m,
-                            const z_digit* v, z_size n) {
+_z_inl _z_wu bool zd_divmod(z_digit* q, z_digit* r, const z_digit* u, z_size m, const z_digit* v,
+                            z_size n) {
     Z_ASSERT(m >= n);
     Z_ASSERT(n > 0);
     Z_ASSERT(v[n - 1]);

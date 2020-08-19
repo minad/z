@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define Z_ALLOC(x)  malloc((size_t)(x) * sizeof (z_digit))
+#define Z_ALLOC(x)  malloc((size_t)(x) * sizeof(z_digit))
 #define Z_FREE(x)   free(x)
 #define Z_ASSERT(x) assert(x)
 #define Z_SCRATCH   64
@@ -19,27 +19,29 @@ typedef z_res (*z_bin_t)(z_int, z_int);
 static gmp_randstate_t randstate;
 
 static z_int mpz_to_z(mpz_srcptr in) {
-    z_int out = { .neg = mpz_sgn(in) < 0, .size = _z_digits((z_size)(mpz_size(in) * GMP_NUMB_BITS)) };
-    out.d = calloc((size_t)out.size, sizeof (z_digit));
-    mpz_export(out.d, 0, -1, Z_BITS/8, 0, 0, in);
+    z_int out = { .neg = mpz_sgn(in) < 0,
+                  .size = _z_digits((z_size)(mpz_size(in) * GMP_NUMB_BITS)) };
+    out.d = calloc((size_t)out.size, sizeof(z_digit));
+    mpz_export(out.d, 0, -1, Z_BITS / 8, 0, 0, in);
     _z_trim(&out);
     return out;
 }
 
 static void z_to_mpz(mpz_ptr out, z_int in) {
     mpz_init(out);
-    mpz_import(out, (size_t)in.size, -1, Z_BITS/8, 0, 0, in.d);
+    mpz_import(out, (size_t)in.size, -1, Z_BITS / 8, 0, 0, in.d);
     if (in.neg)
         mpz_neg(out, out);
 }
 
-static void check_bin(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t f2, mpz_ptr a1, mpz_ptr b1) {
+static void check_bin(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t f2, mpz_ptr a1,
+                      mpz_ptr b1) {
     if (nonzero && !b1->_mp_size)
         return;
 
     z_auto(a2, mpz_to_z(a1));
     z_auto(b2, mpz_to_z(b1));
-    z_auto(u2, z_tryx(f2(a2, b2), gmp_printf("%s failed\n", name); return));
+    z_auto(u2, z_tryx(f2(a2, b2), gmp_printf("%s failed\n", name); return ));
 
     mpz_t r1;
     mpz_init(r1);
@@ -49,8 +51,8 @@ static void check_bin(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t f2, 
     if (z_cmp(u2, r2) != 0) {
         mpz_t u1;
         z_to_mpz(u1, u2);
-        gmp_printf("%s returned invalid result\na = %Zd\nb = %Zd\nr = %Zd\nR = %Zd\n",
-                   name, a1, b1, r1, u1);
+        gmp_printf("%s returned invalid result\na = %Zd\nb = %Zd\nr = %Zd\nR = %Zd\n", name, a1, b1,
+                   r1, u1);
         mpz_clear(u1);
     } else if (u2.size && !u2.d[u2.size - 1]) {
         gmp_printf("%s returned non-normalized result\n", name);
@@ -59,7 +61,8 @@ static void check_bin(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t f2, 
     mpz_clear(r1);
 }
 
-static void check_bin_long(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t f2, long x, long y) {
+static void check_bin_long(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t f2, long x,
+                           long y) {
     mpz_t a1, b1;
     mpz_init(a1);
     mpz_init(b1);
@@ -72,7 +75,8 @@ static void check_bin_long(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t
     mpz_clear(b1);
 }
 
-static void check_bin_rand_neg(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t f2, mpz_ptr a1, mpz_ptr b1) {
+static void check_bin_rand_neg(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t f2, mpz_ptr a1,
+                               mpz_ptr b1) {
     // both positive
     check_bin(name, nonzero, f1, f2, a1, b1);
 
@@ -101,7 +105,7 @@ static void check_bin_rand_neg(const char* name, bool nonzero, mpz_bin_t f1, z_b
 }
 
 static void check_bin_rand(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t f2) {
-    {  // two large values
+    { // two large values
         mpz_t a1, b1;
         mpz_init(a1);
         mpz_init(b1);
@@ -111,7 +115,7 @@ static void check_bin_rand(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t
         mpz_clear(a1);
         mpz_clear(b1);
     }
-    {  // two small values
+    { // two small values
         mpz_t a1, b1;
         mpz_init(a1);
         mpz_init(b1);
@@ -121,7 +125,7 @@ static void check_bin_rand(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t
         mpz_clear(a1);
         mpz_clear(b1);
     }
-    {  // large and small value
+    { // large and small value
         mpz_t a1, b1;
         mpz_init(a1);
         mpz_init(b1);
@@ -131,7 +135,7 @@ static void check_bin_rand(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t
         mpz_clear(a1);
         mpz_clear(b1);
     }
-    {  // small and large value
+    { // small and large value
         mpz_t a1, b1;
         mpz_init(a1);
         mpz_init(b1);
@@ -141,7 +145,7 @@ static void check_bin_rand(const char* name, bool nonzero, mpz_bin_t f1, z_bin_t
         mpz_clear(a1);
         mpz_clear(b1);
     }
-    {  // values of the same size
+    { // values of the same size
         mpz_t a1, b1;
         mpz_init(a1);
         mpz_init(b1);
