@@ -182,8 +182,6 @@ int main(void) {
     test_bin("mul", false, mpz_mul, z_mul);
     test_bin("quo", true, mpz_tdiv_q, z_quo);
     test_bin("rem", true, mpz_tdiv_r, z_rem);
-    test_bin("div", true, mpz_fdiv_q, z_div);
-    test_bin("mod", true, mpz_fdiv_r, z_mod);
     gmp_randclear(randstate);
     // TODO test z_from_b
     // TODO test z_from_d

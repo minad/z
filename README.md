@@ -25,11 +25,8 @@ z_res z_sub_1(z_int a, z_digit b);
 // multiplication
 z_res z_mul(z_int a, z_int b);
 
-// division
-bool z_divmod(z_int* dp, z_int* mp, z_int a, z_int b); // precondition: b!=0
+// truncating division
 bool z_quorem(z_int* qp, z_int* rp, z_int a, z_int b); // precondition: b!=0
-z_res z_div(z_int a, z_int b); // precondition: b!=0
-z_res z_mod(z_int a, z_int b); // precondition: b!=0
 z_res z_quo(z_int a, z_int b); // precondition: b!=0
 z_res z_rem(z_int a, z_int b); // precondition: b!=0
 

@@ -254,8 +254,8 @@ _z_inl _z_wu bool _zd_div_knuth(z_digit* q, z_digit* r, const z_digit* u, z_size
     return true;
 }
 
-_z_inl _z_wu bool zd_divmod(z_digit* q, z_digit* r, const z_digit* u, z_size m, const z_digit* v,
-                            z_size n) {
+_z_inl _z_wu bool zd_div(z_digit* q, z_digit* r, const z_digit* u, z_size m, const z_digit* v,
+                         z_size n) {
     Z_ASSERT(m >= n);
     Z_ASSERT(n > 0);
     Z_ASSERT(v[n - 1]);
